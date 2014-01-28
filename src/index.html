@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html><head>
+  <title>O! - Piqnt</title>
+  <meta name="viewport" content="user-scalable=no, width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+  
+  <style type="text/css">
+    * { margin: 0; padding: 0; border: none; }
+    body, html { height: 100%; width: 100%; background: transparent; }
+    canvas { margin: 0; padding: 0; border: none; }
+    body { overflow: hidden; }
+  </style>
+</head><body>
+
+  <script src="bower_components/cutjs/cut-core.js"></script>
+  <script src="bower_components/cutjs/cut-mouse.js"></script>
+  <script src="bower_components/cutjs/cut-loader.js"></script>
+
+  <script src="bower_components/extrajs/pool.js"></script>
+  <script src="bower_components/extrajs/randomize.js"></script>
+
+  <script src="polyfills.js"></script>
+  <script src="app.js"></script>
+  <script src="textures.js"></script>
+
+  <script>
+    var statusbox = null;
+    function status(msg) {
+      if (!statusbox) {
+        statusbox = document.createElement("div");
+        statusbox.style.position = "absolute";
+        statusbox.style.color = "black";
+        statusbox.style.background = "white";
+        statusbox.style.zIndex = 999;
+        statusbox.style.top = "5px";
+        statusbox.style.right = "5px";
+        statusbox.style.padding = "1px 5px";
+        document.body.appendChild(statusbox);
+      }
+      statusbox.innerHTML = msg;
+    }
+  </script>
+
+</body></html>
