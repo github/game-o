@@ -12,7 +12,7 @@ O! is a JavaScript game so familiarity with JavaScript is required. It is also r
 Use git or the download button (on the right) to download the game source code.
 
 ##### Dependencies
-Dependencies are only [Cut.js](https://github.com/piqnt/cut.js) and [Extra.js](https://github.com/piqnt/extra.js), you can download them using bower (`cd src` then `bower install`) or manually download and add files listed on `src/index.html` and update `src/index.html` to point to them.
+Dependencies are only [Cut.js](https://github.com/piqnt/cut.js) and [Extra.js](https://github.com/piqnt/extra.js), you can download them using bower (`cd src` then `bower install`) or manually download them and update `src/index.html` to point to them.
 
 ##### Run
 Open `src/index.html` with your browser, the game should start, if not check errors with your browser debugging utility.
