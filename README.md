@@ -1,5 +1,5 @@
 # O!
-O! is a minimalistic game and a demo game for [Cut.js](https://github.com/piqnt/cut.js) library. You can [play it online or download mobile apps](http://piqnt.com/o/).
+O! is a minimalistic game and a demo game for [Cut.js](http://cutjs.org/) library. You can [play it online or download mobile apps](http://piqnt.com/o/).
 
 ## Developer
 
