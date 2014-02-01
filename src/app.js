@@ -132,7 +132,6 @@ function Game() {
   var pointer = {};
 
   var time = 0;
-  var lastTime = 0;
   var lastObj = 0;
   var lastDot = 0;
   var pattern = 0;
@@ -145,7 +144,8 @@ function Game() {
   this.energy = 0;
   this.dist = 0;
 
-  this.tick = function() {
+  this.tick = function(t) {
+    t = Math.min(t, 100);
     for (i = inserted.length - 1; i >= 0; i--) {
       obj = inserted[i];
       if (obj.x + (obj.radius || 0) < this.dist + Conf.width) {
@@ -159,10 +159,7 @@ function Game() {
       return;
     }
 
-    var t, d, obj, px, py, x, y, dx, dy, dxy, i, f;
-    t = lastTime || +new Date();
-    lastTime = +new Date();
-    t = Math.min(lastTime - t, 100);
+    var d, obj, px, py, x, y, dx, dy, dxy, i, f;
     d = t * this.speed;
     time += t;
     this.dist += d;
@@ -304,7 +301,6 @@ function Game() {
     pointer = {};
 
     time = 0;
-    lastTime = 0;
     lastObj = this.dist;
     lastDot = this.dist;
     pattern = 0;
@@ -810,8 +806,8 @@ function Play(app) {
     this.hide();
   });
 
-  this.tick(function() {
-    game.tick();
+  this.tick(function(t) {
+    game.tick(t);
   }, true);
 
   var bg = Cut.image("base:playbg").appendTo(this).pin("align", 0.5);
@@ -887,7 +883,7 @@ function Play(app) {
   var l2 = Cut.create().appendTo(field);
   var l3 = Cut.create().appendTo(field);
 
-  field.listen( [ Cut.Mouse.MOVE, Cut.Mouse.START ], function(ev, point) {
+  field.listen([ Cut.Mouse.MOVE, Cut.Mouse.START ], function(ev, point) {
     cursor.xy(point.x, point.y).visible(game.pointer(point.x, point.y));
   });
 

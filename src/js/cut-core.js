@@ -1,5 +1,5 @@
 /*
- * Cut.js
+ * CutJS
  * Copyright (c) 2013-2014 Ali Shakiba, Piqnt LLC and other contributors
  * Available under the MIT license
  * @license
@@ -47,13 +47,17 @@ Cut.create = function() {
 
 Cut.prototype.render = function(context) {
   Cut._stats.tick = Cut._stats.paint = Cut._stats.paste = 0;
-  var t = +new Date();
-  this._tick();
+
+  var now = Cut._now();
+  var elapsed = this._lastTime ? now - this._lastTime : 0;
+  this._lastTime = now;
+
+  this._tick(elapsed);
   this._paint(context);
-  Cut._stats.fps = 1000 / (+new Date() - t);
+  Cut._stats.fps = 1000 / (Cut._now() - now);
 };
 
-Cut.prototype._tick = function() {
+Cut.prototype._tick = function(elapsed) {
   if (!this._visible) {
     return;
   }
@@ -62,19 +66,19 @@ Cut.prototype._tick = function() {
   var length = this._tickBefore.length;
   for (var i = 0; i < length; i++) {
     Cut._stats.tick++;
-    this._tickBefore[i].call(this);
+    this._tickBefore[i].call(this, elapsed);
   }
 
   var child, next = this._first;
   while (child = next) {
     next = child._next;
-    child._tick();
+    child._tick(elapsed);
   }
 
   var length = this._tickAfter.length;
   for (var i = 0; i < length; i++) {
     Cut._stats.tick++;
-    this._tickAfter[i].call(this);
+    this._tickAfter[i].call(this, elapsed);
   }
 };
 
@@ -477,14 +481,12 @@ Cut.Tween = function(cut) {
     return cut._tween;
   }
 
-  var startTime = 0;
   var tween = {};
   var queue = [];
   var next = null;
 
-  function current() {
+  function start() {
     if (next !== queue[queue.length - 1]) {
-      startTime = Cut._now();
       cut.touch();
       queue.push(next);
     }
@@ -506,7 +508,7 @@ Cut.Tween = function(cut) {
   };
 
   tween.pin = function(pin) {
-    var end = current().end;
+    var end = start().end;
     if (arguments.length === 1) {
       Cut._extend(end, arguments[0]);
     } else if (arguments.length === 2) {
@@ -516,12 +518,12 @@ Cut.Tween = function(cut) {
   };
 
   tween.then = function(then) {
-    current().then = then;
+    next.then = then;
     return this;
   };
 
   tween.easing = function(easing) {
-    current().easing = easing;
+    next.easing = easing;
     return this;
   };
 
@@ -533,29 +535,26 @@ Cut.Tween = function(cut) {
     return this;
   };
 
-  cut.tick(function() {
+  cut.tick(function(elapsed) {
     if (!queue.length) {
       return;
     }
 
     this.touch();
 
-    var time = Cut._now();
-    var elapsed = time - startTime;
-
-    if (!elapsed) {
-      return;
-    }
-
     var head = queue[0];
 
-    if (head.delay > 0) {
-      head.delay -= elapsed;
-      startTime = time;
+    if (!head.time) {
+      head.time = 1;
+    } else {
+      head.time += elapsed;
+    }
+
+    if (head.time < head.delay) {
       return;
     }
 
-    var prog = elapsed / head.duration;
+    var prog = (head.time - head.delay) / head.duration;
     var over = prog >= 1;
     prog = prog > 1 ? 1 : prog;
     prog = head.easing ? head.easing(prog) : prog;
@@ -576,7 +575,6 @@ Cut.Tween = function(cut) {
 
     if (over) {
       queue.shift();
-      startTime = time;
       head.then && head.then.call(cut);
     }
 
@@ -718,7 +716,7 @@ Cut.Anim = function() {
 
   this.tick(function() {
     if (this._time && this._frames.length > 1) {
-      var t = +new Date() - this._time;
+      var t = Cut._now() - this._time;
       if (t >= this._ft) {
         var n = t < 2 * this._ft ? 1 : Math.floor(t / this._ft);
         this._time += n * this._ft;
@@ -802,7 +800,7 @@ Cut.Anim.prototype.repeat = function(repeat, callback) {
 
 Cut.Anim.prototype.play = function(reset) {
   if (!this._time || reset) {
-    this._time = +new Date();
+    this._time = Cut._now();
     this.gotoFrame(0);
   }
   return this;
@@ -1155,6 +1153,8 @@ Cut._images = {};
 Cut.loadImages = function(loader, callback) {
   var loading = 0;
 
+  var noimage = true;
+
   var textures = Cut._textures;
   for ( var texture in textures) {
     if (textures[texture].imagePath) {
@@ -1163,6 +1163,12 @@ Cut.loadImages = function(loader, callback) {
       var image = loader(src, complete, error);
       Cut.addImage(image, src);
     }
+    noimage = false;
+  }
+
+  if (noimage) {
+    DEBUG && console.log("No image to load.");
+    callback && callback();
   }
 
   function complete() {
@@ -1199,12 +1205,14 @@ Cut.addTexture = function() {
     Cut._textures[texture.name] = texture;
     Cut.Out._cache[texture.name] = {};
 
-    texture.getImage = function() {
-      if (!this._image) {
-        this._image = Cut.getImage(this.imagePath);
-      }
-      return this._image;
-    };
+    texture.getImage = (function(texture) {
+      return function() {
+        if (!texture._image) {
+          texture._image = Cut.getImage(texture.imagePath);
+        }
+        return texture._image;
+      };
+    })(texture);
 
     var cutout;
     var cutouts = texture.cutouts || texture.sprites;
@@ -1242,12 +1250,12 @@ Cut.addTexture = function() {
   return this;
 };
 
-Cut.Out = function(texture, cutout) {
+Cut.Out = function(cutout, image, ratio) {
 
-  this.texture = texture;
   this.cutout = cutout;
-  this.ratio = texture.imageRatio || 1;
   this.name = cutout.name;
+  this.image = image;
+  this.ratio = ratio || 1;
 
   cutout.w = cutout.w || cutout.width;
   cutout.h = cutout.h || cutout.height;
@@ -1272,7 +1280,7 @@ Cut.Out = function(texture, cutout) {
 };
 
 Cut.Out.prototype.clone = function() {
-  return new Cut.Out(this.texture, this.cutout);
+  return new Cut.Out(this.cutout, this.image, this.ratio);
 };
 
 Cut.Out.prototype.width = function(width) {
@@ -1315,15 +1323,48 @@ Cut.Out.prototype.offset = function(x, y) {
 
 Cut.Out.prototype.paste = function(context) {
   Cut._stats.paste++;
-  var img = this.texture.getImage();
-  img && context.drawImage(img, // source
-  this.sx, this.sy, this.sw, this.sh, // cut
-  this.dx, this.dy, this.dw, this.dh // position
-  );
+  var img = this.image();
+  try {
+    img && context.drawImage(img, // source
+    this.sx, this.sy, this.sw, this.sh, // cut
+    this.dx, this.dy, this.dw, this.dh // position
+    );
+  } catch (e) {
+    if (!this.failed) {
+      console.log("Unable to paste: ", this.sx, this.sy, this.sw, this.sh,
+          this.dx, this.dy, this.dw, this.dh, img);
+    }
+    this.failed = true;
+  }
 };
 
 Cut.Out.prototype.toString = function() {
   return "[" + this.name + ": " + this.dw + "x" + this.dh + "]";
+};
+
+Cut.Out.drawing = function(w, h, ratio, draw, cutout) {
+  var canvas = document.createElement("canvas");
+  var context = canvas.getContext("2d");
+  canvas.width = Math.ceil(w * ratio);
+  canvas.height = Math.ceil(h * ratio);
+
+  if (typeof ratio !== "number") {
+    cutout = draw;
+    draw = ratio;
+    ratio = 1;
+  }
+
+  draw(context);
+
+  cutout || (cutout = {});
+  cutout.x || (cutout.x = 0);
+  cutout.y || (cutout.y = 0);
+  cutout.w || cutout.width || (cutout.w = w);
+  cutout.h || cutout.height || (cutout.h = h);
+
+  return new Cut.Out(cutout, function() {
+    return canvas;
+  }, ratio);
 };
 
 Cut.Out._cache = {};
@@ -1364,7 +1405,8 @@ Cut.Out.select = function(selector, prefix) {
     if (!selected) {
       throw "'" + selector + "' cutout not found!";
     }
-    return selected ? new Cut.Out(texture, selected) : null;
+    return selected ? new Cut.Out(selected, texture.getImage,
+        texture.imageRatio) : null;
 
   } else {
     var selected = Cut.Out._cache[texture.name][name + "*"];
@@ -1384,7 +1426,8 @@ Cut.Out.select = function(selector, prefix) {
     }
     var result = [];
     for (var i = 0; i < selected.length; i++) {
-      result.push(new Cut.Out(texture, selected[i]));
+      result
+          .push(new Cut.Out(selected[i], texture.getImage, texture.imageRatio));
     }
     return result;
   }
@@ -2072,3 +2115,18 @@ Cut._now = (function() {
     };
   }
 })();
+
+Cut._status = function(msg) {
+  if (!(Cut._statusbox)) {
+    var statusbox = Cut._statusbox = document.createElement("div");
+    statusbox.style.position = "absolute";
+    statusbox.style.color = "black";
+    statusbox.style.background = "white";
+    statusbox.style.zIndex = 999;
+    statusbox.style.top = "5px";
+    statusbox.style.right = "5px";
+    statusbox.style.padding = "1px 5px";
+    document.body.appendChild(statusbox);
+  }
+  Cut._statusbox.innerHTML = msg;
+};
